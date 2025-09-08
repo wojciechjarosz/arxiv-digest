@@ -23,7 +23,7 @@ env:
   REGION: europe-central2
   REPO: arxiv-digest
   IMAGE_NAME: arxiv-digest
-  JOB_NAME: arxiv-digest-job
+  JOB_NAME: arxiv-digest
   # Full image path without tag/digest
   IMAGE_BASE: europe-central2-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/arxiv-digest/arxiv-digest
   # Set to "true" to run smoke on push (workflow_dispatch input wins if provided)
