@@ -3,6 +3,10 @@ name: CI/CD (Cloud Run Jobs)
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - '.release-please-manifest.json'
+      - 'version.txt'  
   workflow_dispatch:
     inputs:
       run_job:

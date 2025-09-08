@@ -31,5 +31,4 @@ jobs:
               {"type":"build","section":"Build System","hidden":true},
               {"type":"ci","section":"CI/CD","hidden":false}
             ]
-          bump-minor-pre-major: true
-          # Default uses GITHUB_TOKEN; this is fine.
+
