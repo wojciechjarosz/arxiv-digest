@@ -82,7 +82,9 @@ jobs:
           set -euo pipefail
           IMAGE="${IMAGE_BASE}:${IMAGE_TAG}"
           echo "Building ${IMAGE} ..."
-          gcloud builds submit --tag "${IMAGE}" .
+          gcloud builds submit \
+          --gcs-source-staging-dir "gs://${{ secrets.GCP_PROJECT_ID }}-cb-src-eu/source" \
+          --tag "${IMAGE}" .
 
       # ---- Update Cloud Run Job image ----
       - name: Update Cloud Run Job to new image
