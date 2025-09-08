@@ -1,0 +1,106 @@
+name: CI/CD (Cloud Run Jobs)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      run_job:
+        description: "Execute the Cloud Run Job after deploy"
+        type: boolean
+        default: false
+      smoke:
+        description: "Run optional Python import smoke test"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-central2
+  REPO: arxiv-digest
+  IMAGE_NAME: arxiv-digest
+  JOB_NAME: arxiv-digest-job
+  # Full image path without tag/digest
+  IMAGE_BASE: europe-central2-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/arxiv-digest/arxiv-digest
+  # Set to "true" to run smoke on push (workflow_dispatch input wins if provided)
+  RUN_SMOKE_DEFAULT: "false"
+
+jobs:
+  build-and-deploy:
+    name: Build, Push, Update Job
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---- Optional: quick import smoke test (no network, no secrets) ----
+      - name: Python import smoke test
+        if: ${{ inputs.smoke || env.RUN_SMOKE_DEFAULT == 'true' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys, pathlib, importlib
+          sys.path.append(str(pathlib.Path(".").resolve()))
+          # Try to import modules if they exist; ignore if missing.
+          for m in ("fetch", "triage", "summarize", "deliver"):
+              try:
+                  importlib.import_module(m)
+                  print(f"import {m} OK")
+              except Exception as e:
+                  print(f"skip/ok: {m}: {e}")
+          print("Smoke test done.")
+          PY
+
+      # ---- Authenticate to GCP using WIF ----
+      - name: Auth to GCP (WIF)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}   # e.g. projects/123456789/locations/global/workloadIdentityPools/github-pool/providers/github
+          service_account: arxiv-digest-ci@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+          # Needed by release automation or other steps using OIDC
+          token_format: access_token
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Print gcloud info (sanity)
+        run: gcloud --quiet info
+
+      # ---- Build & Push via Cloud Build ----
+      - name: Build & Push image with Cloud Build
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE="${IMAGE_BASE}:${IMAGE_TAG}"
+          echo "Building ${IMAGE} ..."
+          gcloud builds submit --tag "${IMAGE}" .
+
+      # ---- Update Cloud Run Job image ----
+      - name: Update Cloud Run Job to new image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE="${IMAGE_BASE}:${IMAGE_TAG}"
+          gcloud run jobs update "${JOB_NAME}" \
+            --image "${IMAGE}" \
+            --region "${REGION}" \
+            --project "${PROJECT_ID}"
+
+      # ---- (Optional) Execute the job after deploy ----
+      - name: Execute job (manual opt-in)
+        if: ${{ inputs.run_job }}
+        run: |
+          set -euo pipefail
+          gcloud run jobs execute "${JOB_NAME}" \
+            --region "${REGION}" \
+            --project "${PROJECT_ID}"

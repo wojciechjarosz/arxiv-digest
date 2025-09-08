@@ -54,6 +54,64 @@ The full end-to-end pipeline is live and automated.
   - `SUMMARY_LANG=pl` → experimental Polish summaries.  
 - Fallback summaries ensure the pipeline never breaks.
 
+## CI/CD & Releases
+
+This repo ships a lightweight pipeline for the daily **arxiv-digest** job.
+
+### Deploy pipeline (GitHub Actions)
+- **When**: on pushes to `main` (and manual **Run workflow**).
+- **What**:
+  1. (Optional) quick Python import smoke.
+  2. Auth to GCP using **Workload Identity Federation** (OIDC).
+  3. Build container with **Cloud Build**:  
+     `gcloud builds submit --tag "europe-central2-docker.pkg.dev/$PROJECT_ID/arxiv-digest/arxiv-digest:${GITHUB_SHA}"`
+  4. Update the **Cloud Run Job** image:  
+     `gcloud run jobs update arxiv-digest-job --image "…:${GITHUB_SHA}"`
+  5. (Optional) Execute the job immediately (manual toggle).
+
+**Required GitHub Secrets**
+- `GCP_PROJECT_ID` – your GCP project id.
+- `GCP_WIF_PROVIDER` – the full WIF provider path (from the setup script), e.g.  
+  `projects/123456789/locations/global/workloadIdentityPools/github-pool/providers/github`
+
+**Repo permissions**
+- Actions needs `id-token: write` to fetch the GitHub OIDC token.
+- Default `GITHUB_TOKEN` is enough for Release Please.
+
+### Workload Identity Federation (one-time)
+Run the provided script in this README to create:
+- WIF pool and provider for GitHub OIDC.
+- CI service account: `arxiv-digest-ci@…`
+- IAM roles (least-privilege):
+  - `roles/cloudbuild.builds.editor` (run builds)
+  - `roles/run.admin` (update Cloud Run Job)
+  - `roles/iam.serviceAccountUser` (actAs if needed)
+- Grants `roles/artifactregistry.writer` to the project Cloud Build SA so builds can push.
+
+### Releases & CHANGELOG
+- We use **Conventional Commits**. Common types:
+  - `feat:` new feature
+  - `fix:` bug fix
+  - `docs:`, `chore:`, `refactor:`, `perf:`, `test:`, `ci:`, `build:`
+- The **release-please** action opens a **Release PR** updating `CHANGELOG.md` and version.
+- Merging that PR creates a **Git tag** and **GitHub Release** with notes.
+
+### Cutting a release
+1. Merge PRs with conventional commit messages.
+2. Wait for the **Release PR** (`release-please--branches--main`).
+3. Merge the Release PR → tag + release are created automatically.
+
+### Acceptance checklist
+- Push a commit to `main`:
+  - ✅ CI builds & pushes image.
+  - ✅ Cloud Run Job updated to `…:${GITHUB_SHA}`.
+  - ✅ (Optional) Execute job → logs show the new image tag.
+- Merge a `feat:` or `fix:` PR:
+  - ✅ Release PR opens.
+  - ✅ `CHANGELOG.md` updates.
+  - ✅ Git tag + GitHub Release created.
+
+
 ### 🚀 What’s next
 - **Persistence**: Move from ephemeral SQLite to Firestore or Cloud SQL for cross-day de-duplication.  
 - **Smarter triage**: Replace keyword scoring with vector search or lightweight ML ranking.  
