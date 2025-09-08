@@ -74,17 +74,19 @@ jobs:
       - name: Print gcloud info (sanity)
         run: gcloud --quiet info
 
-      # ---- Build & Push via Cloud Build ----
-      - name: Build & Push image with Cloud Build
+      - name: Configure Docker to use gcloud creds
+        run: |
+          gcloud auth configure-docker europe-central2-docker.pkg.dev --quiet
+
+      - name: Build & Push (runner-side)
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-          IMAGE="${IMAGE_BASE}:${IMAGE_TAG}"
+          IMAGE="${{ env.IMAGE_BASE }}:${IMAGE_TAG}"
           echo "Building ${IMAGE} ..."
-          gcloud builds submit \
-          --gcs-source-staging-dir "gs://${{ secrets.GCP_PROJECT_ID }}-cb-src-eu/source" \
-          --tag "${IMAGE}" .
+          docker build -t "${IMAGE}" .
+          docker push "${IMAGE}"
 
       # ---- Update Cloud Run Job image ----
       - name: Update Cloud Run Job to new image
