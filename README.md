@@ -3,7 +3,7 @@
 A minimal pipeline that fetches recent AI papers from arXiv, filters them, summarizes the most relevant ones, and delivers a daily digest (via email or chat).
 
 ## Project structure
-
+```
 arxiv-digest/
 ├── app/
 │ ├── fetch.py # fetch arXiv Atom feeds
@@ -15,6 +15,7 @@ arxiv-digest/
 ├── pyproject.toml # dependencies + metadata
 ├── README.md
 └── arxiv_digest.db # local sqlite db (runtime only)
+```
 
 ## Installation
 
