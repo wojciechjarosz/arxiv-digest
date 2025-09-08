@@ -1,0 +1,10 @@
+.venv
+*.egg-info
+__pycache__
+.ipynb_checkpoints
+arxiv_digest.db
+.env
+.gitignore
+README.md
+CHANGELOG.md
+.git
