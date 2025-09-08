@@ -1,0 +1,17 @@
+[project]
+name = "arxiv-digest"
+version = "0.1.0"
+description = "Daily arXiv AI paper digest"
+authors = [{ name = "Wojciech Jarosz", email = "wojciech.jarosz@outlook.com" }]
+readme = "README.md"
+requires-python = ">=3.9"
+
+dependencies = [
+    "feedparser==6.0.11",
+    "python-dotenv",
+    "requests==2.32.3",
+    "tenacity==9.0.0",
+]
+
+[tool]
+# later: black, ruff, pytest configs can go here
