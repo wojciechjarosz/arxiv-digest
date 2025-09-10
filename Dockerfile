@@ -10,10 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -r
 COPY pyproject.toml README.md ./
 COPY app ./app
 COPY main.py ./
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 RUN pip install --upgrade pip && pip install .
 
 RUN useradd -m appuser
 USER appuser
 
-ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["/entrypoint.sh"]

@@ -30,16 +30,21 @@ def fetch_arxiv_feed(categories: List[str], max_results: int = 25) -> List[Dict]
     """
     url = _build_query(categories, max_results)
     # Respect arXiv's guidance: set a custom user-agent and avoid hammering
-    feedparser.USER_AGENT = "arxiv-digest/0.1 (contact: youremail@example.com)"
+    feedparser.USER_AGENT = (
+        "arxiv-digest/0.2 "
+        "(contact: jaroszwvb@gmail.com; platform: Python3.11+feedparser; "
+        "repo: https://github.com/wojciechjarosz/arxiv-digest)"
+    )
     parsed = feedparser.parse(url)
 
     entries = []
     for e in parsed.entries:
         entry = {
-            "id": e.get("id"),
+            "id": e.get("id").split("/")[-1],
             "title": e.get("title", "").strip().replace("\n", " "),
             "summary": e.get("summary", "").strip(),
             "link": e.get("link"),
+            "categories": [t["term"] for t in e.get("tags", [])],
             "published": e.get("published"),
             "authors": [a.get("name") for a in e.get("authors", [])],
         }

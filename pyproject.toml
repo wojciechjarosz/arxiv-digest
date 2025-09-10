@@ -8,9 +8,11 @@ requires-python = ">=3.9"
 
 dependencies = [
     "feedparser==6.0.11",
+    "numpy",
     "python-dotenv",
     "requests==2.32.3",
     "tenacity==9.0.0",
+    "tiktoken"
 ]
 
 [tool]

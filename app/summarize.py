@@ -1,14 +1,21 @@
+from dataclasses import dataclass
 from dotenv import load_dotenv
 from tenacity import retry, wait_exponential, stop_after_attempt
 from typing import Dict, List
 
-import logging, os, requests, textwrap
 
-load_dotenv
+import logging, os, requests, textwrap, tiktoken
+
+load_dotenv()
 # --- Config ---
 DEFAULT_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")  # change as you wish
 API_BASE = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
-API_KEY = os.getenv("OPENAI_API_KEY") 
+API_KEY = os.getenv("OPENAI_API_KEY")
+
+try:
+    encoder = tiktoken.encoding_for_model(DEFAULT_MODEL)
+except Exception:
+    encoder = tiktoken.get_encoding("cl100k_base")
 
 # --- Prompt Design ---
 SYSTEM_PROMPT = (
@@ -16,7 +23,7 @@ SYSTEM_PROMPT = (
     "Audience: busy engineers and product leaders. Be accurate, neutral, and specific."
 )
 
-def build_user_prompt(title: str, authors: str, abstract: str) -> str:
+def build_user_prompt(title: str, abstract: str) -> str:
     """
     Short, structured, executive-style prompt (aim ≤200 tokens output).
     """
@@ -31,25 +38,23 @@ def build_user_prompt(title: str, authors: str, abstract: str) -> str:
     Avoid equations/LaTeX. No hype. No bullets beyond those 5 lines.
 
     Title: {title.strip()}
-    Authors: {authors.strip() if authors else "Unknown"}
     Abstract:
     {abstract.strip()}
     """
     return textwrap.dedent(template).strip()
 
 # --- Token budget helpers (very rough heuristics) ---
-def estimate_tokens(text: str) -> int:
-    # ~4 chars/token heuristic; add 10% safety margin
-    return int(len(text) / 4 * 1.1) + 1
+def get_num_tokens(text: str) -> int:
+    return len(encoder.encode(text)) 
 
 def trim_text_to_tokens(text: str, max_tokens: int) -> str:
     # Trim by characters using the 4 chars/token heuristic
+    # Think about removing the most common stopwords first?
     max_chars = int(max_tokens * 4 * 0.9)
     return (text[:max_chars] + "…") if len(text) > max_chars else text
 
 # --- Fallback extractive summarizer (no API key) ---
-def local_fallback_summary(title: str, authors: str, abstract: str) -> str:
-    lines = []
+def local_fallback_summary(title: str, abstract: str) -> str:
     abstract = abstract.strip().replace("\n", " ")
     sents = [s.strip() for s in abstract.split(". ") if s.strip()]
     # crude heuristics: pick first, a middle, and last-ish sentences
@@ -59,7 +64,7 @@ def local_fallback_summary(title: str, authors: str, abstract: str) -> str:
     body = ". ".join([p for p in picks if p])[:900]
     return (
         f"What: {title.strip()}.\n"
-        f"How: Based on the abstract; method described by authors {authors or 'Unknown'}.\n"
+        f"How: Based on the abstract; method described by authors.\n"
         f"Evidence: {body}\n"
         f"Limits: Derived from abstract only; may omit details.\n"
         f"Why it matters: Potential impact depends on claimed contributions."
@@ -79,7 +84,7 @@ def _chat_completion(model: str, system_prompt: str, user_prompt: str, max_outpu
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "temperature": 0.2,
+        "temperature": 0.0,
         "max_tokens": max_output_tokens,
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=30)
@@ -87,32 +92,37 @@ def _chat_completion(model: str, system_prompt: str, user_prompt: str, max_outpu
     data = resp.json()
     return data["choices"][0]["message"]["content"].strip()
 
-def summarize_papers(papers: List[Dict], max_input_tokens: int = 3000, max_output_tokens: int = 220) -> Dict[str, str]:
+@dataclass
+class PaperSummary:
+    arxiv_id: str
+    text: str
+    tokens_in: int
+    tokens_out: int
+    style: str = "exec"
+    model: str = DEFAULT_MODEL
+
+def summarize_papers(papers: List[Dict], max_input_tokens: int = 3000, max_output_tokens: int = 220) -> List[PaperSummary]:
     """
     Summarize a list of papers. Returns {paper_id: summary}.
     Cost-aware: trims abstract if input budget would be exceeded.
     If no API key, returns local fallback summaries.
     """
-    summaries: Dict[str, str] = {}
+
+    summaries: List[PaperSummary] = []
 
     for p in papers:
-        pid = p["id"]
+        pid = p["arxiv_id"]
         title = p.get("title", "") or ""
-        authors = p.get("authors", "") or ""
         abstract = p.get("summary", "") or ""
 
         # Input budgeting: cap the abstract if it's huge
-        base_prompt = build_user_prompt(title, authors, abstract)
-        if estimate_tokens(base_prompt) > max_input_tokens:
+        base_prompt = build_user_prompt(title, abstract)
+        num_input_tokens = get_num_tokens(base_prompt)
+        if num_input_tokens > max_input_tokens:
             # Rebuild with trimmed abstract
             trimmed_abs = trim_text_to_tokens(abstract, max_tokens=int(max_input_tokens * 0.6))
-            base_prompt = build_user_prompt(title, authors, trimmed_abs)
+            base_prompt = build_user_prompt(title, trimmed_abs)
             logging.info("Trimmed abstract for %s to fit token budget.", pid)
-
-        if not API_KEY:
-            logging.warning("OPENAI_API_KEY not set; using local fallback summarizer for %s", pid)
-            summaries[pid] = local_fallback_summary(title, authors, abstract)
-            continue
 
         try:
             out = _chat_completion(
@@ -121,10 +131,20 @@ def summarize_papers(papers: List[Dict], max_input_tokens: int = 3000, max_outpu
                 user_prompt=base_prompt,
                 max_output_tokens=max_output_tokens,
             )
-            summaries[pid] = out
         except Exception as e:
             logging.error("Summarization failed for %s: %s", pid, e)
             # Soft fallback to local so the pipeline keeps moving
-            summaries[pid] = local_fallback_summary(title, authors, abstract)
+            out = local_fallback_summary(title, abstract)
+        
+        summaries.append(
+            PaperSummary(
+                arxiv_id=pid,
+                style="exec",
+                text=out,
+                model=DEFAULT_MODEL,
+                tokens_in=num_input_tokens,
+                tokens_out=get_num_tokens(out),
+            )
+        )
 
     return summaries

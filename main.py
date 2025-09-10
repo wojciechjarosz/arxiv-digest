@@ -1,92 +1,89 @@
+import os, logging
+from datetime import datetime, UTC
+from typing import Dict
+
+from app.storage_sqlite import Storage
 from app.fetch import fetch_arxiv_feed
-from app.db import init_db, upsert_papers, fetch_unprocessed, update_scores, mark_processed
-from app.triage import rank
+from app.triage import rank as triage_rank
 from app.summarize import summarize_papers
-from app.deliver import build_digest_text, build_digest_html, send_email
-from datetime import datetime
-from dotenv import load_dotenv
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from app.deliver import build_digest_html, build_digest_text, send_email
 
-import logging, os
+DB_PATH = os.getenv("DB_PATH", "/tmp/arxiv.db")
+SCHEMA_SQL = os.getenv("SCHEMA_SQL_PATH", "db/schema.sql")
+CATEGORIES = [c.strip() for c in os.getenv("ARXIV_CATEGORIES", "cs.AI,cs.CL,cs.LG,cs.CV").split(",") if c.strip()]
+MAX_RESULTS = int(os.getenv("ARXIV_MAX_RESULTS", "100"))
+TOP_N = int(os.getenv("TRIAGE_TOP_N", "20"))
+MIN_SCORE = float(os.getenv("TRIAGE_MIN_SCORE", "1.0"))
+SUBJECT_PREFIX = os.getenv("SUBJECT_PREFIX", "arXiv Digest")
 
-load_dotenv()
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s"
-)
+def _paper_to_storage(p: Dict) -> Dict:
+    # fetch.py returns keys: id, title, summary, link, published, authors
+    return {
+        "arxiv_id": p["id"],
+        "title": p["title"],
+        "authors": p.get("authors", []),
+        "abstract": p.get("summary", ""),
+        "categories": p.get("categories", CATEGORIES),  # we queried by these; arXiv feed entry may also include cats but feedparser mapping varies
+        "published_at": p.get("published") or datetime.now(UTC).isoformat(),
+        "updated_at": None,
+        "pdf_url": f"https://arxiv.org/pdf/{p["id"]}.pdf",
+        "arxiv_url": p.get("link"),
+        "source": p,
+    }
 
-# ---- Dev knobs via env vars ----
-INCLUDE_PROCESSED = os.getenv("INCLUDE_PROCESSED", "0").lower() in ("1","true","yes")
-FORCE_TOP_N       = os.getenv("FORCE_TOP_N", "0").lower() in ("1","true","yes")
-MIN_SCORE         = float(os.getenv("MIN_SCORE", "1.0"))
-DELIVER           = os.getenv("DELIVER", "1").lower() in ("1","true","yes")
-# -------------------------------
+def run():
+    store = Storage(DB_PATH)
+    # ensure schema present
+    if os.path.exists(SCHEMA_SQL):
+        store.ensure_schema(SCHEMA_SQL)
 
-def step_fetch_store(categories, max_results=25):
-    logging.info("Fetching latest papers...")
-    papers = fetch_arxiv_feed(categories, max_results=max_results)
-    upsert_papers(papers)
-    logging.info("Stored (new) papers. Total fetched: %d", len(papers))
-
-def step_triage(top_n=5):
-    logging.info("Loading unprocessed papers for triage...")
-    candidates = fetch_unprocessed(limit=200)
-    logging.info("Triage candidates: %d", len(candidates))
-    top, scores = rank(candidates, top_n=top_n, min_score=1.0)
-    update_scores(scores)
-    return top
-
-def step_summarize(top_papers):
-    if not top_papers:
-        logging.info("No top papers to summarize.")
-        return {}
-    logging.info("Summarizing %d papers...", len(top_papers))
-    summaries = summarize_papers(top_papers, max_input_tokens=3000, max_output_tokens=220)
-    # mark as processed now; delivery step will read summaries in-memory today
-    mark_processed([p["id"] for p in top_papers])
-    return summaries
-
-def step_deliver(top_papers, summaries):
-    if not top_papers:
-        logging.info("Nothing to deliver.")
+    logging.info("Fetching arXiv for categories=%s max=%d", CATEGORIES, MAX_RESULTS)
+    papers = fetch_arxiv_feed(categories=CATEGORIES, max_results=MAX_RESULTS)
+    if not papers:
+        logging.info("No papers fetched, exiting.")
         return
-    try:
-        tz = ZoneInfo("Europe/Warsaw")
-    except ZoneInfoNotFoundError:
-        tz = ZoneInfo("UTC")
-    today = datetime.now(tz).strftime("%Y-%m-%d")
-    subject = f"arXiv AI digest — {today}"
-    text_body = build_digest_text(top_papers, summaries)
-    html_body = build_digest_html(top_papers, summaries)
-    if DELIVER:
-        send_email(subject, text_body, html_body)
-        # Only mark processed after successful delivery
-        mark_processed([p["id"] for p in top_papers])
-    else:
-        logging.info("DELIVER=0 set — skipping email send (dev mode).")
+
+    # de-dup
+    ids = [p["id"] for p in papers]
+    seen = store.get_seen_ids(ids)
+    new = [p for p in papers if p["id"] not in seen]
+    logging.info("Fetched=%d, new=%d (seen=%d)", len(papers), len(new), len(seen))
+    
+    papers = [_paper_to_storage(p) for p in new]
+    # upsert new
+    store.upsert_papers(papers)
+
+    # triage
+    selected, scores = triage_rank(papers, top_n=TOP_N, min_score=MIN_SCORE)
+    if not selected:
+        logging.info("No papers selected after triage, exiting.")
+        return
+    logging.info("Selected %d papers after triage", len(selected))
+
+    # tag by queried categories (score=1.0)
+    tag_rows = []
+    for p in selected:
+        pid = p["arxiv_id"]
+        for cat in CATEGORIES:
+            tag_rows.append((pid, cat, scores[pid], "category"))
+    if tag_rows:
+        store.tag_papers(tag_rows)
+
+    # summarize (exec style)
+    summaries = summarize_papers(selected, max_output_tokens=int(os.getenv("SUMMARY_TOKENS","500")))
+
+    # persist summaries
+    for summary in summaries:
+        if summary.text:
+            store.put_summary(**summary.__dict__)
+
+    # build and send
+    subject = f"{SUBJECT_PREFIX} — {datetime.now(UTC).strftime('%Y-%m-%d')}"
+    body_html = build_digest_html(selected, summaries)
+    body_text = build_digest_text(selected, summaries)
+    send_email(subject, body_text, body_html)
 
 if __name__ == "__main__":
-    init_db()
-    # Adjust your default categories here
-    categories = ["cs.AI", "cs.LG", "stat.ML"]
-    step_fetch_store(categories, max_results=40)
-    top = step_triage(top_n=5)
-
-    print("\nTop picks to summarize:")
-    for i, p in enumerate(top, 1):
-        s = p.get("title", "").strip().replace("\n", " ")
-        print(f"{i}. {s}  ({p.get('published')})")
-        print(f"   {p.get('link')}")
-    
-    summaries = step_summarize(top)
-
-    if summaries:
-        print("\n=== Daily Digest (draft) ===")
-        for i, p in enumerate(top, 1):
-            sid = p["id"]
-            print(f"\n{i}) {p['title'].strip()}")
-            print(f"Link: {p.get('link')}")
-            print(summaries.get(sid, "[No summary]"))
-
-    step_deliver(top, summaries)
+    run()

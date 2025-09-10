@@ -58,14 +58,14 @@ def score_paper(paper: Dict, inc=None, exc=None) -> float:
 
     return max(0.0, score)
 
-def rank(papers: List[Dict], top_n: int = 5, min_score: float = 1.0):
+def rank(papers: List[Dict], top_n: int = 5, min_score: float = 1.0) -> tuple[List[Dict], Dict[str, float]]:
     """
     Returns (top, scores_map) where top is a list of selected papers.
     """
     scores = {}
     for p in papers:
         s = score_paper(p)
-        scores[p["id"]] = s
-    ranked = sorted(papers, key=lambda x: scores[x["id"]], reverse=True)
-    top = [p for p in ranked if scores[p["id"]] >= min_score][:top_n]
+        scores[p["arxiv_id"]] = s
+    ranked = sorted(papers, key=lambda x: scores[x["arxiv_id"]], reverse=True)
+    top = [p for p in ranked if scores[p["arxiv_id"]] >= min_score][:top_n]
     return top, scores
