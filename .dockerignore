@@ -2,7 +2,8 @@
 *.egg-info
 __pycache__
 .ipynb_checkpoints
-arxiv_digest.db
+arxiv.db
+arxiv_digest.egg-info/*
 .env
 
 
