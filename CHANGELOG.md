@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * change reference to the main.py ([ea308d4](https://github.com/wojciechjarosz/arxiv-digest/commit/ea308d479cfd5af88e05f07442c2061b657d764d))
 
+
 ## [1.3.0](https://github.com/wojciechjarosz/arxiv-digest/compare/v1.2.0...v1.3.0) (2025-09-13)
 
 
