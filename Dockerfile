@@ -18,6 +18,7 @@ RUN apt-get update && \
 COPY pyproject.toml README.md ./
 COPY app ./app
 COPY main.py ./
+COPY db ./db
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

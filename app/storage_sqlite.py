@@ -3,27 +3,7 @@ from typing import List, Tuple
 
 def load_vss(conn: sqlite3.Connection):
     conn.enable_load_extension(True)
-    sqlite_vss.load(conn)  # loads the bundled extension
-    # sanity check – will raise if the extension didn't load
-    conn.execute("SELECT vss_version()").fetchone()
-
-def assert_vss_ready(conn):
-    print("sqlite:", conn.execute("select sqlite_version()").fetchone()[0])
-    try:
-        vss_ver = conn.execute("select vss_version()").fetchone()[0]
-        print("vss_version:", vss_ver)
-    except Exception as e:
-        print("vss_version check failed:", e)
-
-    try:
-        has_tvf = conn.execute(
-            "select count(*) from pragma_function_list where name='vss_search'"
-        ).fetchone()[0]
-        print("has vss_search TVF?:", has_tvf)
-        print("modules:", list(conn.execute("select name from pragma_module_list")))
-    except Exception as e:
-        print("introspection failed:", e)
-
+    sqlite_vss.load(conn)
 
 class Storage:
     def __init__(self, db_path: str):
@@ -32,7 +12,6 @@ class Storage:
         self.c.execute("PRAGMA journal_mode = WAL")
         self.c.execute("PRAGMA synchronous = NORMAL")
         load_vss(self.c)
-        assert_vss_ready(self.c)
 
     # ----- schema -----
     def ensure_schema(self, schema_sql_path: str):
