@@ -33,7 +33,7 @@ else:
 PY
 
 # -------------------- Play: run the pipeline ----------------------
-python -m main.py --db "$DB"
+python main.py --db "$DB"
 
 # -------------------- Night: push snapshot + latest ---------------
 python - "$BUCKET" "$DB" "$STAMP" <<'PY'
