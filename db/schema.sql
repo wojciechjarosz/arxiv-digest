@@ -9,7 +9,20 @@ CREATE TABLE IF NOT EXISTS papers (
   pdf_url      TEXT,
   arxiv_url    TEXT,
   source_json  TEXT NOT NULL,
+  abs_fp       TEXT,                 -- fingerprint of abstract (SHA-256, etc.)
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_papers_absfp ON papers(abs_fp)
+  WHERE abs_fp IS NOT NULL;
+
+-- Virtual table with FAISS index. Use your embedding dim (3072 for text-embedding-3-large)
+CREATE VIRTUAL TABLE IF NOT EXISTS vss_embeddings USING vss0(embedding(3072));
+
+-- Map arxiv_id to vss rowid (rowid is the primary key of vss_embeddings)
+CREATE TABLE IF NOT EXISTS vss_map (
+  rowid     INTEGER PRIMARY KEY,  -- must match vss_embeddings.rowid
+  arxiv_id  TEXT NOT NULL UNIQUE REFERENCES papers(arxiv_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS embeddings (
@@ -44,3 +57,4 @@ CREATE TABLE IF NOT EXISTS summaries (
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (arxiv_id, style)
 );
+

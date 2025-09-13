@@ -4,9 +4,10 @@ from typing import Dict
 
 from app.storage_sqlite import Storage
 from app.fetch import fetch_arxiv_feed
-from app.triage import rank as triage_rank
+from app.triage_vector import rank_query_vss
 from app.summarize import summarize_papers
 from app.deliver import build_digest_html, build_digest_text, send_email
+from app.build_vector import build_vector_base
 
 DB_PATH = os.getenv("DB_PATH", "/tmp/arxiv.db")
 SCHEMA_SQL = os.getenv("SCHEMA_SQL_PATH", "db/schema.sql")
@@ -31,6 +32,7 @@ def _paper_to_storage(p: Dict) -> Dict:
         "pdf_url": f"https://arxiv.org/pdf/{p["id"]}.pdf",
         "arxiv_url": p.get("link"),
         "source": p,
+        "abs_fp": p.get("abs_fp"),
     }
 
 def run():
@@ -48,15 +50,17 @@ def run():
     # de-dup
     ids = [p["id"] for p in papers]
     seen = store.get_seen_ids(ids)
-    new = [p for p in papers if p["id"] not in seen]
-    logging.info("Fetched=%d, new=%d (seen=%d)", len(papers), len(new), len(seen))
+    new_ids = [p["id"] for p in papers if p["id"] not in seen]
+    logging.info("Fetched=%d, new=%d (seen=%d)", len(papers), len(new_ids), len(seen))
     
-    papers = [_paper_to_storage(p) for p in new]
+    papers = [_paper_to_storage(p) for p in papers if p['id'] in new_ids]
     # upsert new
     store.upsert_papers(papers)
 
+    build_vector_base(store)
+
     # triage
-    selected, scores = triage_rank(papers, top_n=TOP_N, min_score=MIN_SCORE)
+    selected = rank_query_vss(store, new_ids, "large language models; multimodal; safety", top_k=TOP_N)
     if not selected:
         logging.info("No papers selected after triage, exiting.")
         return
@@ -65,15 +69,25 @@ def run():
     # tag by queried categories (score=1.0)
     tag_rows = []
     for p in selected:
-        pid = p["arxiv_id"]
         for cat in CATEGORIES:
-            tag_rows.append((pid, cat, scores[pid], "category"))
+            tag_rows.append((p[0], cat, p[1], "category"))
     if tag_rows:
         store.tag_papers(tag_rows)
 
+    selected_ids = {p[0] for p in selected}
+    if not selected_ids:
+        logging.info("No papers selected after triage, exiting.")
+        return
+    
+    selected_papers = [paper for paper in papers if paper["arxiv_id"] in selected_ids]
+    if not selected_papers:
+        logging.info("No papers found in DB for selected IDs, exiting.")
+        return
     # summarize (exec style)
-    summaries = summarize_papers(selected, max_output_tokens=int(os.getenv("SUMMARY_TOKENS","500")))
-
+    summaries = summarize_papers(selected_papers, max_output_tokens=int(os.getenv("SUMMARY_TOKENS","500")))
+    if not summaries:
+        logging.info("No summaries generated, exiting.")
+        return
     # persist summaries
     for summary in summaries:
         if summary.text:
@@ -81,8 +95,8 @@ def run():
 
     # build and send
     subject = f"{SUBJECT_PREFIX} — {datetime.now(UTC).strftime('%Y-%m-%d')}"
-    body_html = build_digest_html(selected, summaries)
-    body_text = build_digest_text(selected, summaries)
+    body_html = build_digest_html(selected_papers, summaries)
+    body_text = build_digest_text(selected_papers, summaries)
     send_email(subject, body_text, body_html)
 
 if __name__ == "__main__":

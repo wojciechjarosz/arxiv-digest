@@ -2,10 +2,10 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 from typing import List, Dict
 from urllib.parse import urlencode, quote_plus
 
-import feedparser
-import time
+import feedparser, hashlib, re, time
 
 ARXIV_BASE = "http://export.arxiv.org/api/query"
+
 
 def _build_query(categories, max_results: int = 25) -> str:
     if not categories:
@@ -20,6 +20,14 @@ def _build_query(categories, max_results: int = 25) -> str:
     }
     # urlencode ensures spaces become '+' and everything is safe
     return f"{ARXIV_BASE}?{urlencode(params, quote_via=quote_plus)}"
+
+def normalize_abstract(s: str) -> str:
+    s = s.lower()
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def abstract_fp(s: str) -> str:
+    return hashlib.sha256(normalize_abstract(s).encode("utf-8")).hexdigest()
 
 @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
 def fetch_arxiv_feed(categories: List[str], max_results: int = 25) -> List[Dict]:
@@ -47,6 +55,7 @@ def fetch_arxiv_feed(categories: List[str], max_results: int = 25) -> List[Dict]
             "categories": [t["term"] for t in e.get("tags", [])],
             "published": e.get("published"),
             "authors": [a.get("name") for a in e.get("authors", [])],
+            "abs_fp": abstract_fp(e.get("summary", "")),
         }
         entries.append(entry)
     # A tiny courtesy sleep; we’ll be even nicer later when paging.
