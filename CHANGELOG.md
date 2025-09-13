@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/wojciechjarosz/arxiv-digest/compare/v1.2.0...v1.3.0) (2025-09-13)
+
+
+### Features
+
+* Add vector base and improve triage ([503ae8c](https://github.com/wojciechjarosz/arxiv-digest/commit/503ae8c4d2c75cff8a5afe8062d37a8cdad4d679))
+
 ## [1.2.0](https://github.com/wojciechjarosz/arxiv-digest/compare/v1.1.0...v1.2.0) (2025-09-10)
 
 
