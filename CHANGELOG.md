@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3](https://github.com/wojciechjarosz/arxiv-digest/compare/v1.3.2...v1.3.3) (2025-09-13)
+
+
+### Bug Fixes
+
+* update Dockerfile to install additional dependencies ([4f3ef76](https://github.com/wojciechjarosz/arxiv-digest/commit/4f3ef76cb24e8ba8beccbee7f2138028ef2e94ba))
+
 ## [1.3.2](https://github.com/wojciechjarosz/arxiv-digest/compare/v1.3.1...v1.3.2) (2025-09-13)
 
 
