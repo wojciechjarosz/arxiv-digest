@@ -1,6 +1,6 @@
 from typing import List, Tuple
 import numpy as np
-from .storage_sqlite import Storage, assert_vss_ready
+from .storage_sqlite import Storage
 from .embeddings import Embedder
 
 def normalize_1(v: np.ndarray) -> np.ndarray:
