@@ -33,7 +33,7 @@ else:
 PY
 
 # -------------------- Play: run the pipeline ----------------------
-python -m arxiv_digest.main --db "$DB"
+python -m main.py --db "$DB"
 
 # -------------------- Night: push snapshot + latest ---------------
 python - "$BUCKET" "$DB" "$STAMP" <<'PY'
