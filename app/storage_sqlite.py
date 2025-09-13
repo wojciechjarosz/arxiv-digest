@@ -20,7 +20,7 @@ class Storage:
 
     # ----- fetch / dedupe -----
     def get_seen_ids(self, arxiv_ids: list[str]) -> set[str]:
-        q = "SELECT arxiv_id FROM papers WHERE arxiv_id IN (%s)" % ",".join("?"*len(arxiv_ids))
+        q = "SELECT arxiv_id FROM summaries WHERE arxiv_id IN (%s)" % ",".join("?"*len(arxiv_ids))
         rows = self.c.execute(q, arxiv_ids).fetchall() if arxiv_ids else []
         return {r[0] for r in rows}
 

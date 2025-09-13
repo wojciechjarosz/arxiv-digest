@@ -60,7 +60,7 @@ def run():
     build_vector_base(store)
 
     # triage
-    selected = rank_query_vss(store, new_ids, "large language models; multimodal; safety", top_k=TOP_N)
+    selected = rank_query_vss(store, "large language models; multimodal; safety", top_k=TOP_N)
     if not selected:
         logging.info("No papers selected after triage, exiting.")
         return
