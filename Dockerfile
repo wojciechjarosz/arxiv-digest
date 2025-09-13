@@ -5,11 +5,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
-RUN apt-get update && \ 
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    tzdata \
-    libgomp1 \
-    libstdc++6 && \
+      tzdata \
+      libgomp1 \
+      libstdc++6 \
+      libblas3 \
+      liblapack3 \
+      libgfortran5 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
