@@ -1,4 +1,4 @@
-import os, logging
+import os, logging, gc
 from datetime import datetime, UTC
 from typing import Dict
 
@@ -31,70 +31,79 @@ def _paper_to_storage(p: Dict) -> Dict:
         "updated_at": None,
         "pdf_url": f"https://arxiv.org/pdf/{p["id"]}.pdf",
         "arxiv_url": p.get("link"),
-        "source": p,
+        "source": None,
         "abs_fp": p.get("abs_fp"),
     }
 
+def _chunks(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i:i+size]
+
 def run():
     store = Storage(DB_PATH)
-    # ensure schema present
     if os.path.exists(SCHEMA_SQL):
         store.ensure_schema(SCHEMA_SQL)
 
     logging.info("Fetching arXiv for categories=%s max=%d", CATEGORIES, MAX_RESULTS)
-    papers = fetch_arxiv_feed(categories=CATEGORIES, max_results=MAX_RESULTS)
-    if not papers:
+    fetched = fetch_arxiv_feed(categories=CATEGORIES, max_results=MAX_RESULTS)
+    if not fetched:
         logging.info("No papers fetched, exiting.")
         return
 
-    # de-dup
-    ids = [p["id"] for p in papers]
+    ids = [p["id"] for p in fetched]
     seen = store.get_seen_ids(ids)
-    new_ids = [p["id"] for p in papers if p["id"] not in seen]
-    logging.info("Fetched=%d, new=%d (seen=%d)", len(papers), len(new_ids), len(seen))
+    raw_new = [p for p in fetched if p["id"] not in seen]
+    del fetched
+    gc.collect()
     
-    papers = [_paper_to_storage(p) for p in papers if p['id'] in new_ids]
-    # upsert new
-    store.upsert_papers(papers)
+    logging.info("New papers=%d", len(raw_new))
+    if not raw_new:
+        return
 
-    build_vector_base(store)
+    stored_new = []
+    for batch in _chunks(raw_new, 20):
+        batch_rows = [_paper_to_storage(p) for p in batch]
+        store.upsert_papers(batch_rows)
+        stored_new.extend(batch_rows)
+    
+    del batch_rows
+    gc.collect()
+    
+    build_vector_base(store, batch=16)
 
-    # triage
-    selected = rank_query_vss(store, "large language models; multimodal; safety", top_k=TOP_N, already_seen=len(seen))
+    selected = rank_query_vss(
+        store,
+        "large language models; multimodal; safety",
+        top_k=TOP_N,
+        already_seen=len(seen),
+    )
     if not selected:
         logging.info("No papers selected after triage, exiting.")
         return
-    logging.info("Selected %d papers after triage", len(selected))
-
-    # tag by queried categories (score=1.0)
-    tag_rows = []
-    for p in selected:
-        for cat in CATEGORIES:
-            tag_rows.append((p[0], cat, p[1], "category"))
-    if tag_rows:
-        store.tag_papers(tag_rows)
 
     selected_ids = {p[0] for p in selected}
-    
-    selected_papers = [paper for paper in papers if paper["arxiv_id"] in selected_ids]
-    if not selected_papers:
-        logging.info("No papers found in DB for selected IDs, exiting.")
-        return
-    # summarize (exec style)
-    summaries = summarize_papers(selected_papers, max_output_tokens=int(os.getenv("SUMMARY_TOKENS","500")))
-    if not summaries:
+    selected_papers = [paper for paper in stored_new if paper["arxiv_id"] in selected_ids]
+
+    all_summaries = []
+    for batch in _chunks(selected_papers, 5):
+        batch_summaries = summarize_papers(
+            batch,
+            max_output_tokens=int(os.getenv("SUMMARY_TOKENS", "500"))
+        )
+        if not batch_summaries:
+            continue
+        for summary in batch_summaries:
+            if summary.text:
+                store.put_summary(**summary.__dict__)
+        all_summaries.extend(batch_summaries)
+
+    if not all_summaries:
         logging.info("No summaries generated, exiting.")
         return
-    # persist summaries
-    for summary in summaries:
-        if summary.text:
-            store.put_summary(**summary.__dict__)
-
-    # build and send
+    del batch_summaries
+    gc.collect()
+    
     subject = f"{SUBJECT_PREFIX} — {datetime.now(UTC).strftime('%Y-%m-%d')}"
-    body_html = build_digest_html(selected_papers, summaries)
-    body_text = build_digest_text(selected_papers, summaries)
+    body_html = build_digest_html(selected_papers, all_summaries)
+    body_text = build_digest_text(selected_papers, all_summaries)
     send_email(subject, body_text, body_html)
-
-if __name__ == "__main__":
-    run()

@@ -46,6 +46,11 @@ bucket_name = bucket_uri.replace("gs://", "", 1).strip("/")
 client = storage.Client()
 bucket = client.bucket(bucket_name)
 
+blobs = list(client.list_blobs(bucket_name, prefix="snapshots/"))
+for blob in blobs:
+    print(f"[persist] deleting {blob.name}")
+    blob.delete()
+
 snap_name = f"snapshots/arxiv-{stamp}.db"
 print(f"[persist] uploading snapshot -> gs://{bucket_name}/{snap_name}")
 bucket.blob(snap_name).upload_from_filename(db_path)
