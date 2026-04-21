@@ -11,7 +11,7 @@ from app.build_vector import build_vector_base
 
 DB_PATH = os.getenv("DB_PATH", "/tmp/arxiv.db")
 SCHEMA_SQL = os.getenv("SCHEMA_SQL_PATH", "db/schema.sql")
-CATEGORIES = [c.strip() for c in os.getenv("ARXIV_CATEGORIES", "cs.AI,cs.CL,cs.LG,cs.CV").split(",") if c.strip()]
+CATEGORIES = [c.strip() for c in os.getenv("ARXIV_CATEGORIES", "cs.DS,cs.DB,cs.IR,cs.DC,cs.NI,cs.OS").split(",") if c.strip()]
 MAX_RESULTS = int(os.getenv("ARXIV_MAX_RESULTS", "100"))
 TOP_N = int(os.getenv("TRIAGE_TOP_N", "20"))
 MIN_SCORE = float(os.getenv("TRIAGE_MIN_SCORE", "1.0"))
