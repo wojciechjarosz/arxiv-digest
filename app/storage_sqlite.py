@@ -39,14 +39,14 @@ class Storage:
                 p["published_at"], p.get("updated_at"),
                 p.get("pdf_url"), p.get("arxiv_url"),
                 # json.dumps(p.get("source", {})),
-                p.get("source")
+                p.get("source"),
                 p.get("abs_fp")
             ))
             update_rows.append((
                 p["title"], authors_s, p["abstract"], cats_s,
                 p.get("updated_at"), p.get("pdf_url"), p.get("arxiv_url"),
                 # json.dumps(p.get("source", {})), 
-                p.get('source')
+                p.get('source'),
                 p.get("abs_fp"),
                 p["arxiv_id"]
             ))
