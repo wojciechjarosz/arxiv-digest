@@ -107,3 +107,6 @@ def run():
     body_html = build_digest_html(selected_papers, all_summaries)
     body_text = build_digest_text(selected_papers, all_summaries)
     send_email(subject, body_text, body_html)
+    
+if __name__ == "__main__":
+    run()
