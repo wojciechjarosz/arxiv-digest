@@ -16,6 +16,13 @@ MAX_RESULTS = int(os.getenv("ARXIV_MAX_RESULTS", "100"))
 TOP_N = int(os.getenv("TRIAGE_TOP_N", "20"))
 MIN_SCORE = float(os.getenv("TRIAGE_MIN_SCORE", "1.0"))
 SUBJECT_PREFIX = os.getenv("SUBJECT_PREFIX", "arXiv Digest")
+TRIAGE_QUERY = (
+    "practical data engineering; production data platforms; distributed data systems; "
+    "ETL and ELT pipelines; orchestration; stream processing; batch processing; "
+    "data quality; observability; metadata; lineage; governance; storage formats; "
+    "query optimization; warehouse and lakehouse architecture; reliability; scalability; "
+    "latency; throughput; fault tolerance; cost optimization; production ML and AI infrastructure"
+)
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
@@ -74,7 +81,7 @@ def run():
 
     selected = rank_query_vss(
         store,
-        "large language models; multimodal; safety",
+        TRIAGE_QUERY,
         top_k=TOP_N,
         already_seen=len(seen),
     )

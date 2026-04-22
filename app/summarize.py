@@ -18,23 +18,31 @@ except Exception:
 
 # --- Prompt Design ---
 SYSTEM_PROMPT = (
-    "You are an expert research analyst. Write concise executive summaries for AI papers. "
-    "Audience: busy engineers and product leaders. Be accurate, neutral, and specific."
+    "You are a senior technical analyst focused on data engineering, analytics engineering, "
+    "data platforms, distributed systems, ML/data infrastructure, and production AI systems. "
+    "Write concise executive summaries for a busy data engineer who wants practical insight, "
+    "career leverage, and implementation relevance. Be accurate, concrete, neutral, and skeptical. "
+    "Prioritize real-world usefulness, system design implications, operational trade-offs, scalability, "
+    "reliability, cost, and what is worth learning or applying."
 )
 
 def build_user_prompt(title: str, abstract: str) -> str:
-    """
-    Short, structured, executive-style prompt (aim ≤200 tokens output).
-    """
     template = f"""
-    Summarize the following paper in ~120–180 words. Use 5 short sections, each a single line:
-    1) What it claims (plain language)
-    2) How it works (key method/idea)
-    3) Evidence (main results; include numbers if present)
-    4) Limits (assumptions/weaknesses)
-    5) Why it matters (practical relevance)
+    Summarize the following paper in ~140–220 words for an experienced data engineer.
 
-    Avoid equations/LaTeX. No hype. No bullets beyond those 5 lines.
+    Use exactly 6 short sections, each on a new line:
+    1) Problem: what engineering problem this paper is trying to solve
+    2) Approach: the key idea, architecture, or method
+    3) Evidence: what results are reported; include numbers if present
+    4) Practical value: where this could matter in production systems or data platforms
+    5) Trade-offs: limitations, assumptions, operational costs, or risks
+    6) Career signal: whether this is worth learning, tracking, or ignoring for a data engineer
+
+    Focus on practical relevance: scalability, reliability, latency, throughput, cost, orchestration,
+    storage, retrieval, pipelines, observability, serving, platform design, and operational complexity.
+
+    Avoid equations, LaTeX, hype, and generic praise.
+    Be precise. If the abstract is vague, say so.
 
     Title: {title.strip()}
     Abstract:
@@ -62,11 +70,12 @@ def local_fallback_summary(title: str, abstract: str) -> str:
              sents[-1] if sents else ""]
     body = ". ".join([p for p in picks if p])[:900]
     return (
-        f"What: {title.strip()}.\n"
-        f"How: Based on the abstract; method described by authors.\n"
+        f"Problem: {title.strip()}.\n"
+        f"Approach: Based only on the abstract; exact implementation details may be missing.\n"
         f"Evidence: {body}\n"
-        f"Limits: Derived from abstract only; may omit details.\n"
-        f"Why it matters: Potential impact depends on claimed contributions."
+        f"Practical value: Potential relevance for data platforms, pipelines, storage, retrieval, or production systems depends on the actual system context.\n"
+        f"Trade-offs: Derived from abstract only; likely misses assumptions, cost, and operational constraints.\n"
+        f"Career signal: Worth deeper review only if it clearly affects production reliability, scale, cost, or developer productivity."
     )
 
 # --- API call with retries ---
