@@ -21,7 +21,7 @@ def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: i
         WITH knn AS (
             SELECT rowid, distance
             FROM vss_embeddings
-            WHERE vss_search(embedding, (memoryview(q.tobytes()),))
+            WHERE vss_search(embedding, {(memoryview(q.tobytes()),)})
             ORDER BY distance ASC
             LIMIT {limit_k}
         )
