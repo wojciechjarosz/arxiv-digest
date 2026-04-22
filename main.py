@@ -77,6 +77,7 @@ def run():
     del batch_rows
     gc.collect()
     
+    store.clear_vss()
     build_vector_base(store, batch=16)
 
     selected = rank_query_vss(

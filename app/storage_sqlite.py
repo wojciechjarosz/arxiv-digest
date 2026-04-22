@@ -167,3 +167,8 @@ class Storage:
         if not row: return None
         dim, blob = row
         return np.frombuffer(blob, dtype=np.float32, count=dim)
+
+    def clear_vss(self):
+        with self.c:
+            self.c.execute("DELETE FROM vss_embeddings")
+            self.c.execute("DELETE FROM vss_map")
