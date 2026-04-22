@@ -52,6 +52,10 @@ class Storage:
                 p.get("abs_fp"),
                 p["arxiv_id"]
             ))
+            
+        logging.info("sample row keys = %s", list(papers[0].keys()))
+        logging.info("sample row = %s", papers[0])
+        logging.info("sample insert row = %s", insert_rows[0])
         # One transaction
         with self.c:
             # 1) Update existing rows (by arxiv_id)
@@ -71,7 +75,7 @@ class Storage:
 
             # 2) Insert new rows; ignore if abs_fp collides (UNIQUE on abs_fp) or arxiv_id collides
             self.c.executemany("""
-                INSERT OR IGNORE INTO papers(
+                INSERT INTO papers(
                     arxiv_id, title, authors, abstract, categories,
                     published_at, updated_at, pdf_url, arxiv_url, source_json, abs_fp
                 )

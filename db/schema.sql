@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS papers (
   updated_at   TEXT,
   pdf_url      TEXT,
   arxiv_url    TEXT,
-  source_json  TEXT NOT NULL,
+  source_json  TEXT,
   abs_fp       TEXT,                 -- fingerprint of abstract (SHA-256, etc.)
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
