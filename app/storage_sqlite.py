@@ -95,18 +95,15 @@ class Storage:
                 cur.execute("INSERT OR REPLACE INTO vss_embeddings(rowid, embedding) VALUES (?, ?)",
                             (rid, memoryview(v.tobytes())))
             
-    def fetch_papers_without_embedding(self, limit: int = 500) -> List[Tuple[str, str]]:
-        """
-        Returns [(arxiv_id, text_for_embedding), ...] for papers that
-        do NOT have an embedding row yet.
-        """
+    def fetch_papers_without_vss_embedding(self, limit: int = 500):
         rows = self.c.execute("""
-        SELECT p.arxiv_id, p.title || CHAR(10) || p.abstract AS txt
-        FROM papers p
-        LEFT JOIN embeddings e ON e.arxiv_id = p.arxiv_id
-        WHERE e.arxiv_id IS NULL
-        ORDER BY p.created_at ASC
-        LIMIT ?
+            SELECT p.arxiv_id, p.title || CHAR(10) || p.abstract AS txt
+            FROM papers p
+            LEFT JOIN vss_map vm ON vm.arxiv_id = p.arxiv_id
+            LEFT JOIN vss_embeddings ve ON ve.rowid = vm.rowid
+            WHERE ve.rowid IS NULL
+            ORDER BY p.created_at ASC
+            LIMIT ?
         """, (limit,)).fetchall()
         return [(r[0], r[1] or "") for r in rows]
 

@@ -11,13 +11,16 @@ def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: i
     embedder = Embedder()
     q = embedder.embed([query])[0].astype(np.float32)
     q = normalize_1(q)
+    limit_k = top_k + already_seen
+    if limit_k <= 0:
+        raise ValueError(f"Invalid limit for vss search: {limit_k}")
     rows = store.c.execute(f"""
         WITH knn AS (
             SELECT rowid, distance
             FROM vss_embeddings
             WHERE vss_search(embedding, ?)
             ORDER BY distance ASC
-            LIMIT {top_k + already_seen}
+            LIMIT {limit_k}
         )
         SELECT m.arxiv_id, knn.distance
         FROM knn

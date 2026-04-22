@@ -15,7 +15,7 @@ def build_vector_base(store: Storage, batch: int = 128):
 
     total = 0
     while True:
-        todo = store.fetch_papers_without_embedding(limit=batch)
+        todo = store.fetch_papers_without_vss_embedding(limit=batch)
         if not todo:
             break
         ids, texts = zip(*todo)
