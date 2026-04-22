@@ -5,6 +5,7 @@ from .embeddings import Embedder
 import logging
 
 def normalize_1(v: np.ndarray) -> np.ndarray:
+    logging.info("method=%s", 'normalize_1')
     n = np.linalg.norm(v, axis=-1, keepdims=True) + 1e-9
     return (v / n).astype(np.float32)
 
