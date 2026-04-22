@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS papers (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_papers_absfp ON papers(abs_fp)
   WHERE abs_fp IS NOT NULL;
 
--- Virtual table with FAISS index. Use your embedding dim (3072 for text-embedding-3-large)
-CREATE VIRTUAL TABLE IF NOT EXISTS vss_embeddings USING vss0(embedding(3072));
+-- Virtual table with FAISS index. Use your embedding dim (1536 for text-embedding-3-large)
+CREATE VIRTUAL TABLE IF NOT EXISTS vss_embeddings USING vss0(embedding(1536));
 
 -- Map arxiv_id to vss rowid (rowid is the primary key of vss_embeddings)
 CREATE TABLE IF NOT EXISTS vss_map (
