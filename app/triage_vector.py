@@ -17,11 +17,25 @@ def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: i
     limit_k = top_k + already_seen
     if limit_k <= 0:
         raise ValueError(f"Invalid limit for vss search: {limit_k}")
-    query = f"""
+    
+    logging.info(f"limit_k = {limit_k}")
+    logging.info(f"q.shape = {q.shape}")
+    logging.info(f"q.dtype = {q.dtype}")
+    logging.info(f"papers = {store.c.execute('SELECT COUNT(*) FROM papers').fetchone()[0]}")
+    logging.info(f"embeddings = {store.c.execute('SELECT COUNT(*) FROM embeddings').fetchone()[0]}")
+    logging.info(f"vss_map = {store.c.execute('SELECT COUNT(*) FROM vss_map').fetchone()[0]}")
+    logging.info("sample vss_map rowids = %s",
+        store.c.execute("SELECT rowid FROM vss_map LIMIT 5").fetchall()
+    )
+    logging.info("vss_embeddings count = %s",
+        store.c.execute("SELECT COUNT(*) FROM vss_embeddings").fetchone()
+    )
+    
+    rows = store.c.execute(f"""
         WITH knn AS (
             SELECT rowid, distance
             FROM vss_embeddings
-            WHERE vss_search(embedding, {(memoryview(q.tobytes()),)})
+            WHERE vss_search(embedding, ?)
             ORDER BY distance ASC
             LIMIT {limit_k}
         )
@@ -31,9 +45,7 @@ def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: i
         LEFT JOIN summaries s ON s.arxiv_id = m.arxiv_id
         WHERE s.arxiv_id IS NULL
         ORDER BY knn.distance ASC
-    """
-    logging.info("query=%s", query)
-    rows = store.c.execute(query).fetchall()
+    """, (memoryview(q.tobytes()),)).fetchall()
 
     # Convert distance -> similarity (optional): for normalized vecs, cosine ~ 1 - 0.5*L2
     # but you can just return -distance for a monotonic score
