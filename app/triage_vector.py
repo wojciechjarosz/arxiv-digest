@@ -17,11 +17,11 @@ def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: i
     limit_k = top_k + already_seen
     if limit_k <= 0:
         raise ValueError(f"Invalid limit for vss search: {limit_k}")
-    rows = store.c.execute(f"""
+    query = f"""
         WITH knn AS (
             SELECT rowid, distance
             FROM vss_embeddings
-            WHERE vss_search(embedding, ?)
+            WHERE vss_search(embedding, (memoryview(q.tobytes()),))
             ORDER BY distance ASC
             LIMIT {limit_k}
         )
@@ -31,7 +31,9 @@ def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: i
         LEFT JOIN summaries s ON s.arxiv_id = m.arxiv_id
         WHERE s.arxiv_id IS NULL
         ORDER BY knn.distance ASC
-    """, (memoryview(q.tobytes()),)).fetchall()
+    """
+    logging.info("query=%s", query)
+    rows = store.c.execute(query).fetchall()
 
     # Convert distance -> similarity (optional): for normalized vecs, cosine ~ 1 - 0.5*L2
     # but you can just return -distance for a monotonic score
