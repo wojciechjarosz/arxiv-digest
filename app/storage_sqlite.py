@@ -26,6 +26,7 @@ class Storage:
         return {r[0] for r in rows}
 
     def upsert_papers(self, papers: list[dict]):
+        logging.info("method=%s", 'upsert_papers')
         if not papers:
             return
 
@@ -51,7 +52,8 @@ class Storage:
                 p.get("abs_fp"),
                 p["arxiv_id"]
             ))
-
+        logging.info("inserted_rows=%d", len(insert_rows))
+        logging.info("updated_rows=%d", len(update_rows))
         # One transaction
         with self.c:
             # 1) Update existing rows (by arxiv_id)

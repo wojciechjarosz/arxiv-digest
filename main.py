@@ -59,10 +59,12 @@ def run():
     logging.info("New papers=%d", len(raw_new))
     if not raw_new:
         return
-    
+
     stored_new = []
     for batch in _chunks(raw_new, 20):
+        logging.info("batch_size = %d", len(batch))
         batch_rows = [_paper_to_storage(p) for p in batch]
+        logging.info("incoming papers = %d", len(batch_rows))
         store.upsert_papers(batch_rows)
         stored_new.extend(batch_rows)
     
