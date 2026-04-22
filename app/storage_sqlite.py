@@ -52,8 +52,6 @@ class Storage:
                 p.get("abs_fp"),
                 p["arxiv_id"]
             ))
-        logging.info("inserted_rows=%d", len(insert_rows))
-        logging.info("updated_rows=%d", len(update_rows))
         # One transaction
         with self.c:
             # 1) Update existing rows (by arxiv_id)
