@@ -2,12 +2,14 @@ from typing import List, Tuple
 import numpy as np
 from .storage_sqlite import Storage
 from .embeddings import Embedder
+import logging
 
 def normalize_1(v: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(v, axis=-1, keepdims=True) + 1e-9
     return (v / n).astype(np.float32)
 
 def rank_query_vss(store: Storage, query: str, top_k: int = 20,  already_seen: int = 0) -> List[Tuple[str, float]]:
+    logging.info("method=%s", 'rank_query_vss')
     embedder = Embedder()
     q = embedder.embed([query])[0].astype(np.float32)
     q = normalize_1(q)

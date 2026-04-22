@@ -2,14 +2,17 @@ from dotenv import load_dotenv
 from .storage_sqlite import Storage
 from .embeddings import Embedder
 import numpy as np, os
+import logging
 
 load_dotenv()
 
 def l2_normalize(v: np.ndarray) -> np.ndarray:
+    logging.info("method=%s", 'l2_normalize')
     n = np.linalg.norm(v, axis=1, keepdims=True) + 1e-9
     return (v / n).astype(np.float32)
 
 def build_vector_base(store: Storage, batch: int = 128):
+    logging.info("method=%s", 'build_vector_base')
     store.ensure_schema(os.getenv("SCHEMA_SQL_PATH", "db/schema.sql"))
     embedder = Embedder()
 

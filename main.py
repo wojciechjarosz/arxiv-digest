@@ -59,7 +59,7 @@ def run():
     logging.info("New papers=%d", len(raw_new))
     if not raw_new:
         return
-
+    
     stored_new = []
     for batch in _chunks(raw_new, 20):
         batch_rows = [_paper_to_storage(p) for p in batch]

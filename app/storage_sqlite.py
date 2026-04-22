@@ -1,5 +1,6 @@
 import sqlite3, sqlite_vss, json, numpy as np
 from typing import List, Tuple
+import logging
 
 def load_vss(conn: sqlite3.Connection):
     conn.enable_load_extension(True)
@@ -96,6 +97,7 @@ class Storage:
                             (rid, memoryview(v.tobytes())))
             
     def fetch_papers_without_vss_embedding(self, limit: int = 500):
+        logging.info("method=%s", 'fetch_papers_without_vss_embedding')
         rows = self.c.execute("""
             SELECT p.arxiv_id, p.title || CHAR(10) || p.abstract AS txt
             FROM papers p
@@ -108,6 +110,7 @@ class Storage:
         return [(r[0], r[1] or "") for r in rows]
 
     def put_embeddings(self, items: list[tuple[str,str,np.ndarray]]):
+        logging.info("method=%s", 'put_embeddings')
         # items: [(arxiv_id, model, vec_np), ...]
         rows = []
         for arxiv_id, model, vec in items:
@@ -122,6 +125,7 @@ class Storage:
 
     def tag_papers(self, tags: list[tuple[str,str,float,str]]):
         # tags: [(arxiv_id, tag_name, score, source), ...]
+        logging.info("method=%s", 'tag_papers')
         if not tags: return
         # ensure tag exists
         unique_tags = {(t[1],t[-1]) for t in tags}
@@ -135,6 +139,7 @@ class Storage:
 
     # ----- summaries -----
     def put_summary(self, arxiv_id: str, text: str, tokens_in: int, tokens_out: int, style: str, model: str):
+        logging.info("method=%s", 'put_summary')
         self.c.execute("""
           INSERT INTO summaries(arxiv_id,style,model,text,tokens_in,tokens_out)
           VALUES(?,?,?,?,?,?)
@@ -146,12 +151,14 @@ class Storage:
 
     # ----- reads for triage / digest -----
     def recent_papers(self, days: int=7) -> list[tuple]:
+        logging.info("method=%s", 'recent_papers')
         return self.c.execute("""
           SELECT arxiv_id,title,abstract FROM papers
           WHERE datetime(published_at) >= datetime('now', ?)
         """, (f'-{days} days',)).fetchall()
 
     def fetch_embedding(self, arxiv_id: str):
+        logging.info("method=%s", 'fetch_embedding')
         row = self.c.execute("SELECT dim, vec FROM embeddings WHERE arxiv_id=?", (arxiv_id,)).fetchone()
         if not row: return None
         dim, blob = row
