@@ -59,6 +59,7 @@ def run():
 
     ids = [p["id"] for p in fetched]
     seen = store.get_seen_ids(ids)
+    
     raw_new = [p for p in fetched if p["id"] not in seen]
     del fetched
     gc.collect()
@@ -67,11 +68,11 @@ def run():
     if not raw_new:
         return
 
+    store.clear_papers()
     stored_new = []
     for batch in _chunks(raw_new, 20):
         batch_rows = [_paper_to_storage(p) for p in batch]
         store.upsert_papers(batch_rows)
-        logging.info(f"papers = {store.c.execute('SELECT COUNT(*) FROM papers').fetchone()[0]}")
         stored_new.extend(batch_rows)
     
     del batch_rows

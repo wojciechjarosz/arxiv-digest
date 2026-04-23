@@ -172,3 +172,7 @@ class Storage:
         with self.c:
             self.c.execute("DELETE FROM vss_embeddings")
             self.c.execute("DELETE FROM vss_map")
+            
+    def clear_papers(self):
+        with self.c:
+            self.c.execute("DELETE FROM papers")
