@@ -75,7 +75,7 @@ class Storage:
 
             # 2) Insert new rows; ignore if abs_fp collides (UNIQUE on abs_fp) or arxiv_id collides
             self.c.executemany("""
-                INSERT INTO papers(
+                INSERT OR IGNORE INTO INTO papers(
                     arxiv_id, title, authors, abstract, categories,
                     published_at, updated_at, pdf_url, arxiv_url, source_json, abs_fp
                 )
